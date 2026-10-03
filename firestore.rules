@@ -1,0 +1,840 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function incoming() {
+      return request.resource.data;
+    }
+    function existing() {
+      return resource.data;
+    }
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+    function isOwner(userId) {
+      return isVerified() && request.auth.uid == userId;
+    }
+    function isAdmin() {
+      return isVerified() && (
+        request.auth.token.email == 'olurantiakin@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // 1. Validation Blueprints
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'photoURL', 'role', 'status', 'preferredGenres', 'readingTheme', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'photoURL', 'role', 'status', 'preferredGenres', 'readingTheme', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && data.photoURL is string && data.photoURL.size() <= 500
+        && data.role is string && data.role in ['reader', 'author', 'admin']
+        && data.status is string && data.status in ['active', 'suspended']
+        && data.preferredGenres is list && data.preferredGenres.size() <= 10
+        && (data.preferredGenres.size() == 0 || (data.preferredGenres[0] is string && data.preferredGenres[0].size() <= 80))
+        && data.readingTheme is string && data.readingTheme in ['light', 'sepia', 'dark']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivate(data) {
+      return data.keys().hasAll(['uid', 'email', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 254
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAdmin(data) {
+      return data.keys().hasAll(['uid', 'grantedAt'])
+        && data.keys().hasOnly(['uid', 'grantedAt'])
+        && isValidId(data.uid)
+        && data.grantedAt is timestamp;
+    }
+
+    function isValidAuthor(data) {
+      return data.keys().hasAll(['id', 'userId', 'penName', 'bio', 'photoUrl', 'location', 'website', 'twitterHandle', 'status', 'copyrightAgreed', 'followersCount', 'totalReads', 'averageRating', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'userId', 'penName', 'bio', 'photoUrl', 'location', 'website', 'twitterHandle', 'status', 'copyrightAgreed', 'followersCount', 'totalReads', 'averageRating', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && data.penName is string && data.penName.size() >= 2 && data.penName.size() <= 120
+        && data.bio is string && data.bio.size() >= 10 && data.bio.size() <= 2000
+        && data.photoUrl is string && data.photoUrl.size() <= 500
+        && data.location is string && data.location.size() >= 2 && data.location.size() <= 120
+        && data.website is string && data.website.size() <= 300
+        && data.twitterHandle is string && data.twitterHandle.size() <= 80
+        && data.status is string && data.status in ['pending', 'approved', 'rejected', 'suspended']
+        && data.copyrightAgreed is bool && data.copyrightAgreed == true
+        && data.followersCount is int && data.followersCount >= 0
+        && data.totalReads is int && data.totalReads >= 0
+        && data.averageRating is number && data.averageRating >= 0 && data.averageRating <= 5
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidBook(data) {
+      return data.keys().hasAll(['id', 'slug', 'title', 'subtitle', 'authorId', 'authorName', 'coverUrl', 'description', 'genre', 'category', 'tags', 'language', 'ageRating', 'isPremium', 'tokenPrice', 'status', 'copyrightConfirmed', 'featured', 'trending', 'chaptersCount', 'readsCount', 'ratingAvg', 'ratingCount', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'slug', 'title', 'subtitle', 'authorId', 'authorName', 'coverUrl', 'description', 'genre', 'category', 'tags', 'language', 'ageRating', 'isPremium', 'tokenPrice', 'status', 'copyrightConfirmed', 'featured', 'trending', 'chaptersCount', 'readsCount', 'ratingAvg', 'ratingCount', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.slug is string && data.slug.size() >= 1 && data.slug.size() <= 160
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.subtitle is string && data.subtitle.size() <= 240
+        && isValidId(data.authorId)
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 120
+        && data.coverUrl is string && data.coverUrl.size() >= 1 && data.coverUrl.size() <= 500
+        && data.description is string && data.description.size() >= 10 && data.description.size() <= 5000
+        && data.genre is string && data.genre.size() >= 1 && data.genre.size() <= 80
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 80
+        && data.tags is list && data.tags.size() <= 10
+        && (data.tags.size() == 0 || (data.tags[0] is string && data.tags[0].size() <= 50))
+        && data.language is string && data.language.size() >= 2 && data.language.size() <= 40
+        && data.ageRating is string && data.ageRating in ['All Ages', '13+', '16+', '18+']
+        && data.isPremium is bool
+        && data.tokenPrice is int && data.tokenPrice >= 0 && data.tokenPrice <= 100000
+        && data.status is string && data.status in ['draft', 'pending_review', 'approved', 'published', 'rejected', 'suspended', 'removed']
+        && data.copyrightConfirmed is bool && data.copyrightConfirmed == true
+        && data.featured is bool
+        && data.trending is bool
+        && data.chaptersCount is int && data.chaptersCount >= 0
+        && data.readsCount is int && data.readsCount >= 0
+        && data.ratingAvg is number && data.ratingAvg >= 0 && data.ratingAvg <= 5
+        && data.ratingCount is int && data.ratingCount >= 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidChapter(data) {
+      return data.keys().hasAll(['id', 'bookId', 'authorId', 'chapterNumber', 'title', 'content', 'wordCount', 'isPremium', 'tokenPrice', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'bookId', 'authorId', 'chapterNumber', 'title', 'content', 'wordCount', 'isPremium', 'tokenPrice', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.bookId)
+        && isValidId(data.authorId)
+        && data.chapterNumber is int && data.chapterNumber >= 1 && data.chapterNumber <= 5000
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.content is string && data.content.size() >= 1 && data.content.size() <= 100000
+        && data.wordCount is int && data.wordCount >= 0
+        && data.isPremium is bool
+        && data.tokenPrice is int && data.tokenPrice >= 0 && data.tokenPrice <= 100000
+        && data.status is string && data.status in ['draft', 'published']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidGenre(data) {
+      return data.keys().hasAll(['id', 'name', 'slug', 'description', 'active', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'slug', 'description', 'active', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 80
+        && data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 80
+        && data.description is string && data.description.size() <= 400
+        && data.active is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['id', 'name', 'slug', 'active', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'slug', 'active', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 80
+        && data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 80
+        && data.active is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidReview(data) {
+      return data.keys().hasAll(['id', 'bookId', 'userId', 'userName', 'rating', 'comment', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'bookId', 'userId', 'userName', 'rating', 'comment', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.bookId)
+        && isValidId(data.userId)
+        && data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 100
+        && data.rating is int && data.rating >= 1 && data.rating <= 5
+        && data.comment is string && data.comment.size() >= 2 && data.comment.size() <= 2000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidBookmark(data) {
+      return data.keys().hasAll(['id', 'userId', 'bookId', 'chapterId', 'chapterNumber', 'note', 'createdAt'])
+        && data.keys().hasOnly(['id', 'userId', 'bookId', 'chapterId', 'chapterNumber', 'note', 'createdAt'])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && isValidId(data.bookId)
+        && isValidId(data.chapterId)
+        && data.chapterNumber is int && data.chapterNumber >= 1
+        && data.note is string && data.note.size() <= 500
+        && data.createdAt is timestamp;
+    }
+
+    function isValidReadingProgress(data) {
+      return data.keys().hasAll(['id', 'userId', 'bookId', 'chapterId', 'chapterNumber', 'percentComplete', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'userId', 'bookId', 'chapterId', 'chapterNumber', 'percentComplete', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && isValidId(data.bookId)
+        && isValidId(data.chapterId)
+        && data.chapterNumber is int && data.chapterNumber >= 1
+        && data.percentComplete is int && data.percentComplete >= 0 && data.percentComplete <= 100
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidLibraryItem(data) {
+      return data.keys().hasAll(['id', 'userId', 'bookId', 'addedAt'])
+        && data.keys().hasOnly(['id', 'userId', 'bookId', 'addedAt'])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && isValidId(data.bookId)
+        && data.addedAt is timestamp;
+    }
+
+    function isValidFollow(data) {
+      return data.keys().hasAll(['id', 'userId', 'authorId', 'createdAt'])
+        && data.keys().hasOnly(['id', 'userId', 'authorId', 'createdAt'])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && isValidId(data.authorId)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidWallet(data) {
+      return data.keys().hasAll(['userId', 'tokenBalance', 'totalTokensPurchased', 'totalTokensSpent', 'authorEarningsTokens', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'tokenBalance', 'totalTokensPurchased', 'totalTokensSpent', 'authorEarningsTokens', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.tokenBalance is int && data.tokenBalance >= 0
+        && data.totalTokensPurchased is int && data.totalTokensPurchased >= 0
+        && data.totalTokensSpent is int && data.totalTokensSpent >= 0
+        && data.authorEarningsTokens is int && data.authorEarningsTokens >= 0
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTokenPackage(data) {
+      return data.keys().hasAll(['id', 'name', 'tokens', 'priceMinorUnits', 'currency', 'active', 'popular', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'tokens', 'priceMinorUnits', 'currency', 'active', 'popular', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+        && data.tokens is int && data.tokens >= 1 && data.tokens <= 1000000
+        && data.priceMinorUnits is int && data.priceMinorUnits >= 0
+        && data.currency is string && data.currency.size() >= 3 && data.currency.size() <= 10
+        && data.active is bool
+        && data.popular is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['id', 'userId', 'packageId', 'paymentReference', 'amountMinorUnits', 'currency', 'tokensPurchased', 'paymentProvider', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'userId', 'packageId', 'paymentReference', 'amountMinorUnits', 'currency', 'tokensPurchased', 'paymentProvider', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && isValidId(data.packageId)
+        && data.paymentReference is string && data.paymentReference.size() >= 3 && data.paymentReference.size() <= 128
+        && data.amountMinorUnits is int && data.amountMinorUnits >= 0
+        && data.currency is string && data.currency.size() >= 3 && data.currency.size() <= 10
+        && data.tokensPurchased is int && data.tokensPurchased >= 1
+        && data.paymentProvider is string && data.paymentProvider.size() >= 2 && data.paymentProvider.size() <= 60
+        && data.status is string && data.status in ['completed', 'pending', 'failed']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidBookUnlock(data) {
+      return data.keys().hasAll(['id', 'userId', 'bookId', 'bookTitle', 'authorId', 'tokensSpent', 'platformShareTokens', 'authorShareTokens', 'createdAt'])
+        && data.keys().hasOnly(['id', 'userId', 'bookId', 'bookTitle', 'authorId', 'tokensSpent', 'platformShareTokens', 'authorShareTokens', 'createdAt'])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && isValidId(data.bookId)
+        && data.bookTitle is string && data.bookTitle.size() >= 1 && data.bookTitle.size() <= 200
+        && isValidId(data.authorId)
+        && data.tokensSpent is int && data.tokensSpent >= 0
+        && data.platformShareTokens is int && data.platformShareTokens >= 0
+        && data.authorShareTokens is int && data.authorShareTokens >= 0
+        && data.tokensSpent == data.platformShareTokens + data.authorShareTokens
+        && data.createdAt is timestamp;
+    }
+
+    function isValidAuthorEarning(data) {
+      return data.keys().hasAll(['id', 'authorId', 'authorUserId', 'bookId', 'unlockId', 'tokensEarned', 'createdAt'])
+        && data.keys().hasOnly(['id', 'authorId', 'authorUserId', 'bookId', 'unlockId', 'tokensEarned', 'createdAt'])
+        && isValidId(data.id)
+        && isValidId(data.authorId)
+        && isValidId(data.authorUserId)
+        && isValidId(data.bookId)
+        && isValidId(data.unlockId)
+        && data.tokensEarned is int && data.tokensEarned >= 0
+        && data.createdAt is timestamp;
+    }
+
+    function isValidWithdrawal(data) {
+      return data.keys().hasAll(['id', 'authorId', 'userId', 'authorName', 'tokensAmount', 'payoutMethod', 'payoutDetails', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'authorId', 'userId', 'authorName', 'tokensAmount', 'payoutMethod', 'payoutDetails', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.authorId)
+        && isValidId(data.userId)
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 120
+        && data.tokensAmount is int && data.tokensAmount >= 10
+        && data.payoutMethod is string && data.payoutMethod.size() >= 2 && data.payoutMethod.size() <= 120
+        && data.payoutDetails is string && data.payoutDetails.size() >= 2 && data.payoutDetails.size() <= 300
+        && data.status is string && data.status in ['pending', 'approved', 'rejected', 'paid']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll(['id', 'reporterId', 'targetType', 'targetId', 'targetTitle', 'reason', 'details', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'reporterId', 'targetType', 'targetId', 'targetTitle', 'reason', 'details', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.reporterId)
+        && data.targetType is string && data.targetType in ['book', 'author', 'review', 'copyright']
+        && isValidId(data.targetId)
+        && data.targetTitle is string && data.targetTitle.size() >= 1 && data.targetTitle.size() <= 200
+        && data.reason is string && data.reason.size() >= 2 && data.reason.size() <= 120
+        && data.details is string && data.details.size() >= 5 && data.details.size() <= 2000
+        && data.status is string && data.status in ['open', 'resolved', 'dismissed']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['id', 'userId', 'title', 'message', 'read', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'userId', 'title', 'message', 'read', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 160
+        && data.message is string && data.message.size() >= 1 && data.message.size() <= 600
+        && data.read is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFeaturedBook(data) {
+      return data.keys().hasAll(['id', 'bookId', 'section', 'priority', 'createdAt'])
+        && data.keys().hasOnly(['id', 'bookId', 'section', 'priority', 'createdAt'])
+        && isValidId(data.id)
+        && isValidId(data.bookId)
+        && data.section is string && data.section.size() >= 1 && data.section.size() <= 80
+        && data.priority is int && data.priority >= 0
+        && data.createdAt is timestamp;
+    }
+
+    function isValidAdvertisement(data) {
+      return data.keys().hasAll(['id', 'slotName', 'placement', 'enabled', 'adType', 'publisherId', 'adSlotId', 'headline', 'ctaText', 'ctaUrl', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'slotName', 'placement', 'enabled', 'adType', 'publisherId', 'adSlotId', 'headline', 'ctaText', 'ctaUrl', 'updatedAt'])
+        && isValidId(data.id)
+        && data.slotName is string && data.slotName.size() >= 2 && data.slotName.size() <= 100
+        && data.placement is string && data.placement in ['homepage_banner', 'catalog_inline', 'book_detail_sidebar']
+        && data.enabled is bool
+        && data.adType is string && data.adType in ['adsense', 'sponsored_campaign']
+        && data.publisherId is string && data.publisherId.size() <= 100
+        && data.adSlotId is string && data.adSlotId.size() <= 100
+        && data.headline is string && data.headline.size() <= 160
+        && data.ctaText is string && data.ctaText.size() <= 60
+        && data.ctaUrl is string && data.ctaUrl.size() <= 300
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPlatformSettings(data) {
+      return data.keys().hasAll(['id', 'authorRevenueSharePercent', 'requireBookApproval', 'requireAuthorApproval', 'heroHeadline', 'heroSubheadline', 'announcementBanner', 'adsEnabled', 'seoTitle', 'seoDescription', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'authorRevenueSharePercent', 'requireBookApproval', 'requireAuthorApproval', 'heroHeadline', 'heroSubheadline', 'announcementBanner', 'adsEnabled', 'seoTitle', 'seoDescription', 'updatedAt'])
+        && isValidId(data.id)
+        && data.authorRevenueSharePercent is int && data.authorRevenueSharePercent >= 10 && data.authorRevenueSharePercent <= 95
+        && data.requireBookApproval is bool
+        && data.requireAuthorApproval is bool
+        && data.heroHeadline is string && data.heroHeadline.size() >= 5 && data.heroHeadline.size() <= 200
+        && data.heroSubheadline is string && data.heroSubheadline.size() >= 5 && data.heroSubheadline.size() <= 400
+        && data.announcementBanner is string && data.announcementBanner.size() <= 300
+        && data.adsEnabled is bool
+        && data.seoTitle is string && data.seoTitle.size() >= 5 && data.seoTitle.size() <= 120
+        && data.seoDescription is string && data.seoDescription.size() >= 10 && data.seoDescription.size() <= 300
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['id', 'actorId', 'actorName', 'action', 'targetType', 'targetId', 'details', 'createdAt'])
+        && data.keys().hasOnly(['id', 'actorId', 'actorName', 'action', 'targetType', 'targetId', 'details', 'createdAt'])
+        && isValidId(data.id)
+        && isValidId(data.actorId)
+        && data.actorName is string && data.actorName.size() >= 1 && data.actorName.size() <= 120
+        && data.action is string && data.action.size() >= 2 && data.action.size() <= 120
+        && data.targetType is string && data.targetType.size() >= 2 && data.targetType.size() <= 80
+        && isValidId(data.targetId)
+        && data.details is string && data.details.size() <= 1000
+        && data.createdAt is timestamp;
+    }
+
+    // 2. Collection Match Blocks
+
+    // Users (Public Profile - PII isolated)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUser(incoming())
+        && incoming().uid == userId
+        && incoming().status == 'active'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (incoming().role in ['reader', 'author'] || isAdmin());
+      allow update: if isValidId(userId)
+        && isValidUser(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            isOwner(userId)
+            && existing().status == 'active'
+            && incoming().status == existing().status
+            && (incoming().role == existing().role || (existing().role == 'reader' && incoming().role == 'author'))
+            && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'preferredGenres', 'readingTheme', 'role', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(userId) && isAdmin();
+
+      // Isolated PII Subcollection
+      match /private/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+        allow list: if isAdmin();
+        allow create: if isValidId(userId) && isValidId(docId)
+          && isOwner(userId)
+          && isValidUserPrivate(incoming())
+          && incoming().uid == userId
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if isValidId(userId) && isValidId(docId)
+          && isValidUserPrivate(incoming())
+          && incoming().uid == existing().uid
+          && incoming().updatedAt == request.time
+          && (
+            isAdmin() ||
+            (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'updatedAt']))
+          );
+        allow delete: if isValidId(userId) && isValidId(docId) && isAdmin();
+      }
+    }
+
+    // Admins
+    match /admins/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isValidId(userId) && isAdmin() && isValidAdmin(incoming()) && incoming().uid == userId && incoming().grantedAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // Authors
+    match /authors/{authorId} {
+      allow get: if isValidId(authorId) && (resource.data.status == 'approved' || isOwner(resource.data.userId) || isAdmin());
+      allow list: if resource.data.status == 'approved' || (isVerified() && resource.data.userId == request.auth.uid) || isAdmin();
+      allow create: if isValidId(authorId)
+        && isVerified()
+        && isValidAuthor(incoming())
+        && incoming().id == authorId
+        && (incoming().userId == request.auth.uid || isAdmin())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(authorId)
+        && isValidAuthor(incoming())
+        && incoming().id == existing().id
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            isOwner(existing().userId)
+            && existing().status != 'suspended'
+            && incoming().status == existing().status
+            && incoming().diff(existing()).affectedKeys().hasOnly(['penName', 'bio', 'photoUrl', 'location', 'website', 'twitterHandle', 'updatedAt'])
+          ) ||
+          (
+            isVerified()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['followersCount', 'totalReads', 'averageRating', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(authorId) && isAdmin();
+    }
+
+    // Books
+    match /books/{bookId} {
+      allow get: if isValidId(bookId) && (resource.data.status == 'published' || isOwner(resource.data.authorId) || isAdmin());
+      allow list: if resource.data.status == 'published' || (isVerified() && resource.data.authorId == request.auth.uid) || isAdmin();
+      allow create: if isValidId(bookId)
+        && isVerified()
+        && isValidBook(incoming())
+        && incoming().id == bookId
+        && (incoming().authorId == request.auth.uid || isAdmin())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/authors/$(incoming().authorId));
+      allow update: if isValidId(bookId)
+        && isValidBook(incoming())
+        && incoming().id == existing().id
+        && incoming().authorId == existing().authorId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            isOwner(existing().authorId)
+            && existing().status != 'suspended'
+            && existing().status != 'removed'
+            && incoming().status in ['draft', 'pending_review', 'published']
+            && incoming().featured == existing().featured
+            && incoming().trending == existing().trending
+            && incoming().diff(existing()).affectedKeys().hasOnly(['slug', 'title', 'subtitle', 'coverUrl', 'description', 'genre', 'category', 'tags', 'language', 'ageRating', 'isPremium', 'tokenPrice', 'status', 'chaptersCount', 'updatedAt'])
+          ) ||
+          (
+            isVerified()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['readsCount', 'ratingAvg', 'ratingCount', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(bookId) && isAdmin();
+    }
+
+    // Chapters
+    match /chapters/{chapterId} {
+      allow get: if isValidId(chapterId) && (resource.data.status == 'published' || isOwner(resource.data.authorId) || isAdmin());
+      allow list: if resource.data.status == 'published' || (isVerified() && resource.data.authorId == request.auth.uid) || isAdmin();
+      allow create: if isValidId(chapterId)
+        && isVerified()
+        && isValidChapter(incoming())
+        && incoming().id == chapterId
+        && (incoming().authorId == request.auth.uid || isAdmin())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/books/$(incoming().bookId));
+      allow update: if isValidId(chapterId)
+        && isValidChapter(incoming())
+        && incoming().id == existing().id
+        && incoming().bookId == existing().bookId
+        && incoming().authorId == existing().authorId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            isOwner(existing().authorId)
+            && incoming().diff(existing()).affectedKeys().hasOnly(['chapterNumber', 'title', 'content', 'wordCount', 'isPremium', 'tokenPrice', 'status', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(chapterId) && (isOwner(resource.data.authorId) || isAdmin());
+    }
+
+    // Genres
+    match /genres/{genreId} {
+      allow get: if isValidId(genreId) && (resource.data.active == true || isAdmin());
+      allow list: if resource.data.active == true || isAdmin();
+      allow create: if isValidId(genreId) && isAdmin() && isValidGenre(incoming()) && incoming().id == genreId && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isValidId(genreId) && isValidGenre(incoming()) && isAdmin() && incoming().id == existing().id && incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow delete: if isValidId(genreId) && isAdmin();
+    }
+
+    // Categories
+    match /categories/{categoryId} {
+      allow get: if isValidId(categoryId) && (resource.data.active == true || isAdmin());
+      allow list: if resource.data.active == true || isAdmin();
+      allow create: if isValidId(categoryId) && isAdmin() && isValidCategory(incoming()) && incoming().id == categoryId && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isValidId(categoryId) && isValidCategory(incoming()) && isAdmin() && incoming().id == existing().id && incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow delete: if isValidId(categoryId) && isAdmin();
+    }
+
+    // Reviews
+    match /reviews/{reviewId} {
+      allow get: if isValidId(reviewId) && (resource.data.rating >= 1 || isAdmin());
+      allow list: if resource.data.rating >= 1 || isAdmin();
+      allow create: if isValidId(reviewId)
+        && isVerified()
+        && isValidReview(incoming())
+        && incoming().id == reviewId
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/books/$(incoming().bookId));
+      allow update: if isValidId(reviewId)
+        && isValidReview(incoming())
+        && incoming().id == existing().id
+        && incoming().bookId == existing().bookId
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (isOwner(existing().userId) && incoming().diff(existing()).affectedKeys().hasOnly(['rating', 'comment', 'updatedAt']))
+        );
+      allow delete: if isValidId(reviewId) && (isOwner(resource.data.userId) || isAdmin());
+    }
+
+    // Bookmarks
+    match /bookmarks/{bookmarkId} {
+      allow get: if isValidId(bookmarkId) && (isOwner(resource.data.userId) || isAdmin());
+      allow list: if isVerified() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isValidId(bookmarkId)
+        && isVerified()
+        && isValidBookmark(incoming())
+        && incoming().id == bookmarkId
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/books/$(incoming().bookId));
+      allow update: if false;
+      allow delete: if isValidId(bookmarkId) && (isOwner(resource.data.userId) || isAdmin());
+    }
+
+    // Reading Progress
+    match /readingProgress/{progressId} {
+      allow get: if isValidId(progressId) && (isOwner(resource.data.userId) || isAdmin());
+      allow list: if isVerified() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isValidId(progressId)
+        && isVerified()
+        && isValidReadingProgress(incoming())
+        && incoming().id == progressId
+        && incoming().userId == request.auth.uid
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/books/$(incoming().bookId));
+      allow update: if isValidId(progressId)
+        && isValidReadingProgress(incoming())
+        && incoming().id == existing().id
+        && incoming().userId == existing().userId
+        && incoming().bookId == existing().bookId
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (isOwner(existing().userId) && incoming().diff(existing()).affectedKeys().hasOnly(['chapterId', 'chapterNumber', 'percentComplete', 'updatedAt']))
+        );
+      allow delete: if isValidId(progressId) && (isOwner(resource.data.userId) || isAdmin());
+    }
+
+    // Libraries
+    match /libraries/{libraryId} {
+      allow get: if isValidId(libraryId) && (isOwner(resource.data.userId) || isAdmin());
+      allow list: if isVerified() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isValidId(libraryId)
+        && isVerified()
+        && isValidLibraryItem(incoming())
+        && incoming().id == libraryId
+        && incoming().userId == request.auth.uid
+        && incoming().addedAt == request.time
+        && exists(/databases/$(database)/documents/books/$(incoming().bookId));
+      allow update: if false;
+      allow delete: if isValidId(libraryId) && (isOwner(resource.data.userId) || isAdmin());
+    }
+
+    // Follows
+    match /follows/{followId} {
+      allow get: if isValidId(followId) && (isOwner(resource.data.userId) || isAdmin());
+      allow list: if isVerified() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isValidId(followId)
+        && isVerified()
+        && isValidFollow(incoming())
+        && incoming().id == followId
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/authors/$(incoming().authorId));
+      allow update: if false;
+      allow delete: if isValidId(followId) && (isOwner(resource.data.userId) || isAdmin());
+    }
+
+    // Wallets
+    match /wallets/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isValidId(userId)
+        && (isOwner(userId) || isAdmin())
+        && isValidWallet(incoming())
+        && incoming().userId == userId
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isValidWallet(incoming())
+        && incoming().userId == existing().userId
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            isVerified()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['tokenBalance', 'totalTokensPurchased', 'totalTokensSpent', 'authorEarningsTokens', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // Token Packages
+    match /tokenPackages/{packageId} {
+      allow get: if isValidId(packageId) && (resource.data.active == true || isAdmin());
+      allow list: if resource.data.active == true || isAdmin();
+      allow create: if isValidId(packageId) && isAdmin() && isValidTokenPackage(incoming()) && incoming().id == packageId && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isValidId(packageId) && isValidTokenPackage(incoming()) && isAdmin() && incoming().id == existing().id && incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow delete: if isValidId(packageId) && isAdmin();
+    }
+
+    // Transactions (Immutable financial ledger)
+    match /transactions/{transactionId} {
+      allow get: if isValidId(transactionId) && (isOwner(resource.data.userId) || isAdmin());
+      allow list: if isVerified() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isValidId(transactionId)
+        && isVerified()
+        && isValidTransaction(incoming())
+        && incoming().id == transactionId
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/tokenPackages/$(incoming().packageId));
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Book Unlocks (Immutable unlock ledger with atomic wallet existence check)
+    match /bookUnlocks/{unlockId} {
+      allow get: if isValidId(unlockId) && (isOwner(resource.data.userId) || isOwner(resource.data.authorId) || isAdmin());
+      allow list: if isVerified() && (resource.data.userId == request.auth.uid || resource.data.authorId == request.auth.uid || isAdmin());
+      allow create: if isValidId(unlockId)
+        && isVerified()
+        && isValidBookUnlock(incoming())
+        && incoming().id == unlockId
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/books/$(incoming().bookId))
+        && existsAfter(/databases/$(database)/documents/wallets/$(request.auth.uid));
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Author Earnings (Immutable earnings ledger)
+    match /authorEarnings/{earningId} {
+      allow get: if isValidId(earningId) && (isOwner(resource.data.authorUserId) || isAdmin());
+      allow list: if isVerified() && (resource.data.authorUserId == request.auth.uid || isAdmin());
+      allow create: if isValidId(earningId)
+        && isVerified()
+        && isValidAuthorEarning(incoming())
+        && incoming().id == earningId
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/books/$(incoming().bookId))
+        && existsAfter(/databases/$(database)/documents/bookUnlocks/$(incoming().unlockId));
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Withdrawals (Terminal state lock once paid/rejected)
+    match /withdrawals/{withdrawalId} {
+      allow get: if isValidId(withdrawalId) && (isOwner(resource.data.userId) || isAdmin());
+      allow list: if isVerified() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isValidId(withdrawalId)
+        && isVerified()
+        && isValidWithdrawal(incoming())
+        && incoming().id == withdrawalId
+        && incoming().userId == request.auth.uid
+        && incoming().status == 'pending'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/authors/$(incoming().authorId));
+      allow update: if isValidId(withdrawalId)
+        && isValidWithdrawal(incoming())
+        && incoming().id == existing().id
+        && incoming().userId == existing().userId
+        && incoming().authorId == existing().authorId
+        && incoming().tokensAmount == existing().tokensAmount
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && isAdmin()
+        && !(existing().status in ['paid', 'rejected'])
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // Reports
+    match /reports/{reportId} {
+      allow get: if isValidId(reportId) && (isOwner(resource.data.reporterId) || isAdmin());
+      allow list: if isVerified() && (resource.data.reporterId == request.auth.uid || isAdmin());
+      allow create: if isValidId(reportId)
+        && isVerified()
+        && isValidReport(incoming())
+        && incoming().id == reportId
+        && incoming().reporterId == request.auth.uid
+        && incoming().status == 'open'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(reportId)
+        && isValidReport(incoming())
+        && isAdmin()
+        && incoming().id == existing().id
+        && incoming().reporterId == existing().reporterId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if isValidId(reportId) && isAdmin();
+    }
+
+    // Notifications
+    match /notifications/{notificationId} {
+      allow get: if isValidId(notificationId) && (isOwner(resource.data.userId) || isAdmin());
+      allow list: if isVerified() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isValidId(notificationId)
+        && isVerified()
+        && isValidNotification(incoming())
+        && incoming().id == notificationId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(notificationId)
+        && isValidNotification(incoming())
+        && incoming().id == existing().id
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (isOwner(existing().userId) && incoming().diff(existing()).affectedKeys().hasOnly(['read', 'updatedAt']))
+        );
+      allow delete: if isValidId(notificationId) && (isOwner(resource.data.userId) || isAdmin());
+    }
+
+    // Featured Books
+    match /featuredBooks/{featuredId} {
+      allow get: if isValidId(featuredId) && (resource.data.priority >= 0 || isAdmin());
+      allow list: if resource.data.priority >= 0 || isAdmin();
+      allow create: if isValidId(featuredId) && isAdmin() && isValidFeaturedBook(incoming()) && incoming().id == featuredId && incoming().createdAt == request.time;
+      allow update: if isValidId(featuredId) && isValidFeaturedBook(incoming()) && isAdmin() && incoming().id == existing().id && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(featuredId) && isAdmin();
+    }
+
+    // Advertisements
+    match /advertisements/{adId} {
+      allow get: if isValidId(adId) && (resource.data.enabled == true || isAdmin());
+      allow list: if resource.data.enabled == true || isAdmin();
+      allow create: if isValidId(adId) && isAdmin() && isValidAdvertisement(incoming()) && incoming().id == adId && incoming().updatedAt == request.time;
+      allow update: if isValidId(adId) && isValidAdvertisement(incoming()) && isAdmin() && incoming().id == existing().id && incoming().updatedAt == request.time;
+      allow delete: if isValidId(adId) && isAdmin();
+    }
+
+    // Platform Settings
+    match /settings/{settingId} {
+      allow get: if isValidId(settingId) && (resource.data.authorRevenueSharePercent >= 10 || isAdmin());
+      allow list: if resource.data.authorRevenueSharePercent >= 10 || isAdmin();
+      allow create: if isValidId(settingId) && isAdmin() && isValidPlatformSettings(incoming()) && incoming().id == settingId && incoming().updatedAt == request.time;
+      allow update: if isValidId(settingId) && isValidPlatformSettings(incoming()) && isAdmin() && incoming().id == existing().id && incoming().updatedAt == request.time;
+      allow delete: if isValidId(settingId) && isAdmin();
+    }
+
+    // Audit Logs (Immutable admin audit log)
+    match /auditLogs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(logId) && isAdmin() && isValidAuditLog(incoming()) && incoming().id == logId && incoming().actorId == request.auth.uid && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

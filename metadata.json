@@ -1,0 +1,6 @@
+{
+  "name": "LitVault — Read. Discover. Publish.",
+  "description": "International digital literary platform where readers discover novels, short stories, and poetry while authors publish and monetize their works.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

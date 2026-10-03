@@ -1,0 +1,519 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Public reader/author/admin profile without PII",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "photoURL": { "type": "string", "maxLength": 500 },
+        "role": { "type": "string", "enum": ["reader", "author", "admin"] },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "preferredGenres": { "type": "array", "maxLength": 10 },
+        "readingTheme": { "type": "string", "enum": ["light", "sepia", "dark"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "role", "status", "createdAt", "updatedAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Isolated PII for user profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "maxLength": 254 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "updatedAt"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Admin role assignment document",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "grantedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "grantedAt"]
+    },
+    "Author": {
+      "title": "Author",
+      "description": "Author public profile and publishing verification state",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "penName": { "type": "string", "maxLength": 120 },
+        "bio": { "type": "string", "maxLength": 2000 },
+        "photoUrl": { "type": "string", "maxLength": 500 },
+        "location": { "type": "string", "maxLength": 120 },
+        "website": { "type": "string", "maxLength": 300 },
+        "twitterHandle": { "type": "string", "maxLength": 80 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "suspended"] },
+        "copyrightAgreed": { "type": "boolean" },
+        "followersCount": { "type": "number" },
+        "totalReads": { "type": "number" },
+        "averageRating": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "penName", "bio", "location", "status", "copyrightAgreed", "followersCount", "totalReads", "averageRating", "createdAt", "updatedAt"]
+    },
+    "Book": {
+      "title": "Book",
+      "description": "Structured literary book record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "slug": { "type": "string", "maxLength": 160 },
+        "title": { "type": "string", "maxLength": 200 },
+        "subtitle": { "type": "string", "maxLength": 240 },
+        "authorId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "maxLength": 120 },
+        "coverUrl": { "type": "string", "maxLength": 500 },
+        "description": { "type": "string", "maxLength": 5000 },
+        "genre": { "type": "string", "maxLength": 80 },
+        "category": { "type": "string", "maxLength": 80 },
+        "tags": { "type": "array", "maxLength": 10 },
+        "language": { "type": "string", "maxLength": 40 },
+        "ageRating": { "type": "string", "enum": ["All Ages", "13+", "16+", "18+"] },
+        "isPremium": { "type": "boolean" },
+        "tokenPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["draft", "pending_review", "approved", "published", "rejected", "suspended", "removed"] },
+        "copyrightConfirmed": { "type": "boolean" },
+        "featured": { "type": "boolean" },
+        "trending": { "type": "boolean" },
+        "chaptersCount": { "type": "number" },
+        "readsCount": { "type": "number" },
+        "ratingAvg": { "type": "number" },
+        "ratingCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "slug", "title", "authorId", "authorName", "coverUrl", "description", "genre", "category", "tags", "language", "ageRating", "isPremium", "tokenPrice", "status", "copyrightConfirmed", "featured", "trending", "chaptersCount", "readsCount", "ratingAvg", "ratingCount", "createdAt", "updatedAt"]
+    },
+    "Chapter": {
+      "title": "Chapter",
+      "description": "Individual chapter record belonging to a book",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "bookId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "chapterNumber": { "type": "number" },
+        "title": { "type": "string", "maxLength": 200 },
+        "content": { "type": "string", "maxLength": 100000 },
+        "wordCount": { "type": "number" },
+        "isPremium": { "type": "boolean" },
+        "tokenPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "bookId", "authorId", "chapterNumber", "title", "content", "wordCount", "isPremium", "tokenPrice", "status", "createdAt", "updatedAt"]
+    },
+    "Genre": {
+      "title": "Genre",
+      "description": "Literary genre managed by administrators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 80 },
+        "slug": { "type": "string", "maxLength": 80 },
+        "description": { "type": "string", "maxLength": 400 },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "slug", "description", "active", "createdAt", "updatedAt"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Book format or editorial category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 80 },
+        "slug": { "type": "string", "maxLength": 80 },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "slug", "active", "createdAt", "updatedAt"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Reader book review and rating",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "bookId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "maxLength": 100 },
+        "rating": { "type": "number" },
+        "comment": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "bookId", "userId", "userName", "rating", "comment", "createdAt", "updatedAt"]
+    },
+    "Bookmark": {
+      "title": "Bookmark",
+      "description": "Reader chapter bookmark",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "bookId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "chapterId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "chapterNumber": { "type": "number" },
+        "note": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "bookId", "chapterId", "chapterNumber", "note", "createdAt"]
+    },
+    "ReadingProgress": {
+      "title": "ReadingProgress",
+      "description": "Reader reading progress per book",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "bookId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "chapterId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "chapterNumber": { "type": "number" },
+        "percentComplete": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "bookId", "chapterId", "chapterNumber", "percentComplete", "updatedAt"]
+    },
+    "LibraryItem": {
+      "title": "LibraryItem",
+      "description": "Book saved in a reader's personal library",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "bookId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "addedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "bookId", "addedAt"]
+    },
+    "Follow": {
+      "title": "Follow",
+      "description": "Reader following an author",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "authorId", "createdAt"]
+    },
+    "Wallet": {
+      "title": "Wallet",
+      "description": "User LitToken wallet and author earnings balance in integer minor units",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tokenBalance": { "type": "number" },
+        "totalTokensPurchased": { "type": "number" },
+        "totalTokensSpent": { "type": "number" },
+        "authorEarningsTokens": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "tokenBalance", "totalTokensPurchased", "totalTokensSpent", "authorEarningsTokens", "updatedAt"]
+    },
+    "TokenPackage": {
+      "title": "TokenPackage",
+      "description": "Configurable LitToken package",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 100 },
+        "tokens": { "type": "number" },
+        "priceMinorUnits": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "active": { "type": "boolean" },
+        "popular": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "tokens", "priceMinorUnits", "currency", "active", "popular", "createdAt", "updatedAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Immutable token purchase transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "packageId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "paymentReference": { "type": "string", "maxLength": 128 },
+        "amountMinorUnits": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "tokensPurchased": { "type": "number" },
+        "paymentProvider": { "type": "string", "maxLength": 60 },
+        "status": { "type": "string", "enum": ["completed", "pending", "failed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "packageId", "paymentReference", "amountMinorUnits", "currency", "tokensPurchased", "paymentProvider", "status", "createdAt", "updatedAt"]
+    },
+    "BookUnlock": {
+      "title": "BookUnlock",
+      "description": "Immutable record of a reader unlocking a premium book or chapter",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "bookId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "bookTitle": { "type": "string", "maxLength": 200 },
+        "authorId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tokensSpent": { "type": "number" },
+        "platformShareTokens": { "type": "number" },
+        "authorShareTokens": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "bookId", "bookTitle", "authorId", "tokensSpent", "platformShareTokens", "authorShareTokens", "createdAt"]
+    },
+    "AuthorEarning": {
+      "title": "AuthorEarning",
+      "description": "Author revenue ledger entry from book unlocks",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorUserId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "bookId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "unlockId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tokensEarned": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "authorId", "authorUserId", "bookId", "unlockId", "tokensEarned", "createdAt"]
+    },
+    "Withdrawal": {
+      "title": "Withdrawal",
+      "description": "Author payout withdrawal request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "maxLength": 120 },
+        "tokensAmount": { "type": "number" },
+        "payoutMethod": { "type": "string", "maxLength": 120 },
+        "payoutDetails": { "type": "string", "maxLength": 300 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "paid"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "authorId", "userId", "authorName", "tokensAmount", "payoutMethod", "payoutDetails", "status", "createdAt", "updatedAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Content or copyright moderation report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "reporterId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "targetType": { "type": "string", "enum": ["book", "author", "review", "copyright"] },
+        "targetId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "targetTitle": { "type": "string", "maxLength": 200 },
+        "reason": { "type": "string", "maxLength": 120 },
+        "details": { "type": "string", "maxLength": 2000 },
+        "status": { "type": "string", "enum": ["open", "resolved", "dismissed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "reporterId", "targetType", "targetId", "targetTitle", "reason", "details", "status", "createdAt", "updatedAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app user notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "maxLength": 160 },
+        "message": { "type": "string", "maxLength": 600 },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title", "message", "read", "createdAt", "updatedAt"]
+    },
+    "FeaturedBook": {
+      "title": "FeaturedBook",
+      "description": "Editorial featured book placement",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "bookId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "section": { "type": "string", "maxLength": 80 },
+        "priority": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "bookId", "section", "priority", "createdAt"]
+    },
+    "Advertisement": {
+      "title": "Advertisement",
+      "description": "Configurable ad slot or sponsored literary campaign",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "slotName": { "type": "string", "maxLength": 100 },
+        "placement": { "type": "string", "enum": ["homepage_banner", "catalog_inline", "book_detail_sidebar"] },
+        "enabled": { "type": "boolean" },
+        "adType": { "type": "string", "enum": ["adsense", "sponsored_campaign"] },
+        "publisherId": { "type": "string", "maxLength": 100 },
+        "adSlotId": { "type": "string", "maxLength": 100 },
+        "headline": { "type": "string", "maxLength": 160 },
+        "ctaText": { "type": "string", "maxLength": 60 },
+        "ctaUrl": { "type": "string", "maxLength": 300 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "slotName", "placement", "enabled", "adType", "publisherId", "adSlotId", "headline", "ctaText", "ctaUrl", "updatedAt"]
+    },
+    "PlatformSettings": {
+      "title": "PlatformSettings",
+      "description": "Global platform configuration and revenue share rules",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorRevenueSharePercent": { "type": "number" },
+        "requireBookApproval": { "type": "boolean" },
+        "requireAuthorApproval": { "type": "boolean" },
+        "heroHeadline": { "type": "string", "maxLength": 200 },
+        "heroSubheadline": { "type": "string", "maxLength": 400 },
+        "announcementBanner": { "type": "string", "maxLength": 300 },
+        "adsEnabled": { "type": "boolean" },
+        "seoTitle": { "type": "string", "maxLength": 120 },
+        "seoDescription": { "type": "string", "maxLength": 300 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "authorRevenueSharePercent", "requireBookApproval", "requireAuthorApproval", "heroHeadline", "heroSubheadline", "announcementBanner", "adsEnabled", "seoTitle", "seoDescription", "updatedAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable administrative audit log entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actorId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actorName": { "type": "string", "maxLength": 120 },
+        "action": { "type": "string", "maxLength": 120 },
+        "targetType": { "type": "string", "maxLength": 80 },
+        "targetId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "details": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "actorId", "actorName", "action", "targetType", "targetId", "details", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Public user profiles"
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": "UserPrivateInfo",
+      "description": "Isolated PII for user profile"
+    },
+    "/admins/{userId}": {
+      "schema": "Admin",
+      "description": "Administrator registry"
+    },
+    "/authors/{authorId}": {
+      "schema": "Author",
+      "description": "Author profiles and statistics"
+    },
+    "/books/{bookId}": {
+      "schema": "Book",
+      "description": "Literary books catalog"
+    },
+    "/chapters/{chapterId}": {
+      "schema": "Chapter",
+      "description": "Book chapters"
+    },
+    "/genres/{genreId}": {
+      "schema": "Genre",
+      "description": "Literary genres"
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Editorial categories"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Reader book reviews"
+    },
+    "/bookmarks/{bookmarkId}": {
+      "schema": "Bookmark",
+      "description": "Reader chapter bookmarks"
+    },
+    "/readingProgress/{progressId}": {
+      "schema": "ReadingProgress",
+      "description": "Reader progress per book"
+    },
+    "/libraries/{libraryId}": {
+      "schema": "LibraryItem",
+      "description": "Saved books in personal libraries"
+    },
+    "/follows/{followId}": {
+      "schema": "Follow",
+      "description": "Reader-to-author follow relationships"
+    },
+    "/wallets/{userId}": {
+      "schema": "Wallet",
+      "description": "User LitToken wallet balances"
+    },
+    "/tokenPackages/{packageId}": {
+      "schema": "TokenPackage",
+      "description": "Configurable LitToken packages"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Token purchase transactions"
+    },
+    "/bookUnlocks/{unlockId}": {
+      "schema": "BookUnlock",
+      "description": "Book unlock transactions"
+    },
+    "/authorEarnings/{earningId}": {
+      "schema": "AuthorEarning",
+      "description": "Author revenue share ledger"
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "Withdrawal",
+      "description": "Author withdrawal requests"
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Content and copyright moderation reports"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications"
+    },
+    "/featuredBooks/{featuredId}": {
+      "schema": "FeaturedBook",
+      "description": "Featured book placements"
+    },
+    "/advertisements/{adId}": {
+      "schema": "Advertisement",
+      "description": "Ad placements and campaigns"
+    },
+    "/settings/{settingId}": {
+      "schema": "PlatformSettings",
+      "description": "Global platform settings"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Administrative audit trail"
+    }
+  }
+}
